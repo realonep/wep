@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BOND EXPERT SIMULATOR v3.7</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,700;0,900;1,900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #ffffff; color: #000000; }
+        .font-black-italic { font-weight: 900; font-style: italic; }
+        input[type="range"] { -webkit-appearance: none; background: #e5e7eb; height: 4px; border-radius: 2px; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; background: #000000; border-radius: 50%; cursor: pointer; }
+        .panel-border { border: 1px solid #e5e7eb; }
+        .table-header { border-bottom: 2px solid #000000; }
+        .text-zinc-400 { color: #a1a1aa; }
+        /* Responsive price box to avoid overflow on large numbers */
+        .price-box { display:flex; align-items:baseline; gap:1rem; min-width:0 }
+        #currentPrice { flex-shrink:1; min-width:0; font-size: clamp(1.75rem, 4.5vw, 4rem); line-height:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:6px; position:relative; z-index:1 }
+        #priceChangePct { flex-shrink:0; white-space:nowrap; font-size: clamp(0.9rem, 2.2vw, 1.25rem); position:relative; z-index:2 }
+    </style>
+</head>
+<body class="antialiased p-6 md:p-12">
+
+    <div class="max-w-7xl mx-auto space-y-10">
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-end border-b-8 border-black pb-8">
+            <div>
+                <div class="flex items-center gap-2 mb-2 text-zinc-400">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    <span class="text-xs font-bold tracking-[0.4em] uppercase">Market Analytics Terminal</span>
+                </div>
+                <h1 class="text-6xl font-black-italic tracking-tighter leading-none uppercase">Bond Expert</h1>
+            </div>
+            <div class="text-right">
+                <span class="text-sm font-bold bg-black text-white px-4 py-1 mb-2 inline-block italic tracking-widest">v3.7 STABLE <span class="text-[10px] normal-case">by 일상아빠</span></span>
+                <p class="text-[11px] text-zinc-400 font-bold uppercase tracking-widest">Visual Studio Code Edition</p>
+            </div>
+        </header>
+
+        <main class="grid grid-cols-1 lg:grid-cols-12 gap-10">
+            <!-- Left: Configuration -->
+            <aside class="lg:col-span-4 space-y-8">
+                <div class="bg-gray-50 p-8 panel-border">
+                    <h2 class="text-xs font-black uppercase tracking-widest mb-8 border-b border-gray-200 pb-4">Configuration</h2>
+                    
+                    <div class="space-y-8">
+                        <div>
+                            <div class="flex justify-between text-[10px] font-black uppercase text-gray-400 mb-2">
+                                <label>액면가 (Face Value)</label>
+                                <span class="text-black font-bold italic" id="faceValueText">₩10,000</span>
+                            </div>
+                            <input type="number" id="faceValue" value="10000" class="w-full bg-white border-b-2 border-gray-300 p-2 text-2xl font-black focus:border-black outline-none">
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between text-[10px] font-black uppercase text-gray-400 mb-2">
+                                <label>표면금리 (Coupon Rate)</label>
+                                <span class="text-black font-bold italic" id="couponRateText">3.00%</span>
+                            </div>
+                            <input type="range" id="couponRate" min="0" max="10" step="0.1" value="3.0" class="w-full">
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between text-[10px] font-black uppercase text-gray-400 mb-2">
+                                <label>만기 (Maturity)</label>
+                                <span class="text-black font-bold italic" id="maturityText">30 Years</span>
+                            </div>
+                            <input type="range" id="maturity" min="1" max="50" step="1" value="30" class="w-full">
+                        </div>
+
+                        <div class="pt-8 border-t-2 border-gray-200">
+                            <div class="flex justify-between items-center mb-4">
+                                <label class="text-xs font-black uppercase">Market Interest Rate</label>
+                                <span class="text-4xl font-black-italic" id="marketRateText">3.0%</span>
+                            </div>
+                            <input type="range" id="marketRate" min="0" max="15" step="0.05" value="3.0" class="w-full h-4 bg-black rounded-none appearance-none cursor-pointer">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-black text-white p-8 text-center">
+                    <p class="text-[10px] font-bold uppercase tracking-[0.3em] opacity-40 mb-2">Pricing Logic</p>
+                    <div id="katexFormula" class="font-serif italic text-lg tracking-tighter"></div>
+                </div>
+            </aside>
+
+            <!-- Right: Results & Visualization -->
+            <div class="lg:col-span-8 space-y-8">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-white border-[8px] border-black p-10 flex flex-col justify-center shadow-xl">
+                        <p class="text-[10px] font-black uppercase tracking-[0.4em] text-gray-400 mb-4 uppercase">Theoretical Price</p>
+                        <div class="price-box">
+                            <span class="text-6xl font-black-italic tracking-tighter" id="currentPrice">₩10,000</span>
+                            <span class="text-lg font-black" id="priceChangePct">(0.0%)</span>
+                        </div>
+                    </div>
+                    <div class="bg-gray-100 p-10 flex flex-col justify-center border border-gray-200">
+                        <h4 class="text-[9px] font-black uppercase tracking-[0.4em] text-gray-400 mb-4">Financial Status</h4>
+                        <div class="space-y-3">
+                            <div class="flex justify-between text-xs">
+                                <span class="font-bold text-gray-500 uppercase">Total Interest</span>
+                                <span class="font-black" id="totalInterest">₩9,000</span>
+                            </div>
+                            <div class="flex justify-between text-xs">
+                                <span class="font-bold text-gray-500 uppercase tracking-tighter">Capital Gain/Loss</span>
+                                <span class="font-black italic" id="capitalGain">₩0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chart Container -->
+                <div class="bg-white border border-gray-200 p-10 h-[480px] flex flex-col relative">
+                    <div class="flex items-center justify-between mb-6">
+                        <h3 class="text-xs font-black uppercase tracking-widest italic underline decoration-4">Price Sensitivity Curve</h3>
+                        <div class="flex items-center gap-4">
+                            <div class="flex items-center gap-1.5"><div class="w-3 h-3 bg-black"></div><span class="text-[9px] font-bold uppercase">Price</span></div>
+                            <div class="flex items-center gap-1.5"><div class="w-3 h-3 rounded-full border-2 border-black bg-white"></div><span class="text-[9px] font-bold uppercase">Current</span></div>
+                        </div>
+                    </div>
+                    <div class="flex-grow">
+                        <canvas id="bondChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Bottom Simulation Table -->
+        <footer class="mt-12 space-y-6">
+            <h3 class="text-xs font-black uppercase tracking-widest border-b-2 border-gray-100 pb-2">Time Travel Simulation (돈의 시간 여행)</h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-gray-50">
+                        <tr class="table-header">
+                            <th class="p-4 font-black uppercase">기간 (Year)</th>
+                            <th class="p-4 font-black uppercase">미래에 받을 돈</th>
+                            <th class="p-4 font-black uppercase">기차표 값 (할인율)</th>
+                            <th class="p-4 font-black uppercase">오늘 도착한 몸무게 (가치)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="timelineBody" class="divide-y divide-gray-100">
+                        <!-- Rows generated by JS -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="bg-gray-50 p-8 border-l-[12px] border-black">
+                <h4 class="text-xs font-black uppercase tracking-widest mb-2">Analyst Note for Junior Investors</h4>
+                <p class="text-sm text-gray-500 leading-relaxed font-medium">
+                    "기차표 값" 비유를 기억해 보세요. 시장 금리가 올라가는 것은 미래에서 오는 돈들이 내야 하는 <strong>기차표 값(할인율)</strong>이 비싸지는 것입니다. 
+                    여행 기간이 길수록(장기채권), 기차를 여러 번 갈아타고 표 값을 여러 번 내야 하기 때문에 오늘 도착했을 때의 <strong>몸무게(현재 가치)</strong>가 훨씬 더 가벼워지게 됩니다. 
+                    이것이 바로 금리가 오를 때 장기채권 가격이 반토막 나는 이유입니다.
+                </p>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        const ctx = document.getElementById('bondChart').getContext('2d');
+        let chart;
+
+        const inputs = {
+            face: document.getElementById('faceValue'),
+            coupon: document.getElementById('couponRate'),
+            maturity: document.getElementById('maturity'),
+            market: document.getElementById('marketRate')
+        };
+
+        const displays = {
+            face: document.getElementById('faceValueText'),
+            coupon: document.getElementById('couponRateText'),
+            maturity: document.getElementById('maturityText'),
+            market: document.getElementById('marketRateText'),
+            price: document.getElementById('currentPrice'),
+            change: document.getElementById('priceChangePct'),
+            interest: document.getElementById('totalInterest'),
+            gain: document.getElementById('capitalGain'),
+            timeline: document.getElementById('timelineBody')
+        };
+
+        function calculateBondPrice(mRate, fVal, cRate, mat) {
+            const r = mRate / 100;
+            const c = (fVal * (cRate / 100));
+            if (Math.abs(r) < 1e-12) return (c * mat) + fVal;
+
+            let pv = 0;
+            for (let t = 1; t <= mat; t++) {
+                pv += c / Math.pow(1 + r, t);
+            }
+            pv += fVal / Math.pow(1 + r, mat);
+            return pv;
+        }
+
+        function updateUI() {
+            const fVal = Number(inputs.face.value);
+            const cRate = Number(inputs.coupon.value);
+            const mat = Number(inputs.maturity.value);
+            const mRate = Number(inputs.market.value);
+
+            displays.face.innerText = `₩${fVal.toLocaleString()}`;
+            displays.coupon.innerText = `${cRate.toFixed(2)}%`;
+            displays.maturity.innerText = `${mat} Years`;
+            displays.market.innerText = `${mRate.toFixed(2)}%`;
+
+            const price = calculateBondPrice(mRate, fVal, cRate, mat);
+            const changePct = ((price / fVal - 1) * 100).toFixed(1);
+
+            displays.price.innerText = `₩${Math.round(price).toLocaleString()}`;
+            displays.change.innerText = `(${changePct > 0 ? '+' : ''}${changePct}%)`;
+            displays.change.className = `text-lg font-black ${changePct >= 0 ? 'text-black' : 'text-gray-300'}`;
+            
+            displays.interest.innerText = `₩${Math.round(fVal * (cRate/100) * mat).toLocaleString()}`;
+            displays.gain.innerText = `₩${Math.round(price - fVal).toLocaleString()}`;
+
+            updateTimeline(fVal, cRate, mRate, mat);
+            updateChart(fVal, cRate, mat, mRate);
+            // ensure price stays on one line by shrinking if needed
+            fitPriceToSingleLine();
+        }
+
+        function updateTimeline(fVal, cRate, mRate, mat) {
+            const r = mRate / 100;
+            const c = fVal * (cRate / 100);
+            let html = '';
+            
+            const years = mat > 4 ? [1, 2, 3, '...', mat] : Array.from({length: mat}, (_, i) => i + 1);
+            
+            years.forEach(year => {
+                if (year === '...') {
+                    html += `<tr><td colspan="4" class="p-4 text-center text-gray-300">...</td></tr>`;
+                } else {
+                    const cashflow = (year === mat) ? (fVal + c) : c;
+                    const discountFactor = Math.pow(1 + r, year);
+                    const pv = cashflow / discountFactor;
+                    html += `
+                        <tr class="hover:bg-gray-50 transition-colors">
+                            <td class="p-4 font-bold text-gray-400">${year}년 차</td>
+                            <td class="p-4">₩${cashflow.toLocaleString()}</td>
+                            <td class="p-4">÷ ${discountFactor.toFixed(4)}</td>
+                            <td class="p-4 font-black">₩${Math.round(pv).toLocaleString()}</td>
+                        </tr>
+                    `;
+                }
+            });
+            displays.timeline.innerHTML = html;
+        }
+
+        function updateChart(fVal, cRate, mat, currentR) {
+            // sample every 0.05% to match slider resolution
+            const points = [];
+            for (let i = 0; i <= 300; i++) {
+                const r = +(i * 0.05).toFixed(2);
+                points.push({ x: r, y: calculateBondPrice(r, fVal, cRate, mat) });
+            }
+
+            const currentPriceAtRate = calculateBondPrice(currentR, fVal, cRate, mat);
+
+            if (chart) {
+                chart.data.datasets[0].data = points;
+                chart.data.datasets[1].data = [{ x: +currentR, y: currentPriceAtRate }];
+                chart.update('none');
+            } else {
+                chart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        datasets: [
+                            {
+                                label: 'Price Curve',
+                                data: points,
+                                borderColor: '#000000',
+                                borderWidth: 2,
+                                pointRadius: 0,
+                                fill: false,
+                                tension: 0.25,
+                                parsing: false,
+                                order: 2
+                            },
+                            {
+                                label: 'Current Point',
+                                data: [{ x: +currentR, y: currentPriceAtRate }],
+                                type: 'scatter',
+                                pointBackgroundColor: '#ffffff',
+                                pointBorderColor: '#000000',
+                                pointBorderWidth: 2,
+                                pointRadius: 6,
+                                pointHoverRadius: 8,
+                                order: 1,
+                                z: 10,
+                                parsing: false
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: {
+                                type: 'linear',
+                                min: 0,
+                                max: 15,
+                                title: { display: true, text: '시장 금리 (%)' },
+                                ticks: { stepSize: 1 }
+                            },
+                            y: {
+                                grid: { color: '#f3f4f6' },
+                                title: { display: true, text: '채권 가격 (원)' }
+                            }
+                        },
+                        animation: false
+                    }
+                });
+            }
+        }
+
+        // Fit the price text to a single line by reducing font-size if necessary
+        function fitPriceToSingleLine() {
+            const priceEl = displays.price;
+            const changeEl = displays.change;
+            const box = document.querySelector('.price-box');
+            if (!priceEl || !box) return;
+
+            // compute available width for price element
+            const boxStyle = window.getComputedStyle(box);
+            const gap = parseFloat(boxStyle.gap || boxStyle.columnGap || 0) || 16;
+            const paddingBuffer = 20; // increased safety buffer to avoid clipping
+            const boxWidth = box.clientWidth;
+            const changeWidth = changeEl ? changeEl.getBoundingClientRect().width : 0;
+            const available = Math.max(0, boxWidth - changeWidth - gap - paddingBuffer);
+
+            // start from current computed font-size (px)
+            const computed = window.getComputedStyle(priceEl);
+            let fontSize = parseFloat(computed.fontSize) || 32;
+            const minFont = 10; // px
+
+            // ensure single-line and shrink until it fits
+            priceEl.style.whiteSpace = 'nowrap';
+            priceEl.style.overflow = 'hidden';
+            while (fontSize > minFont) {
+                priceEl.style.fontSize = fontSize + 'px';
+                // allow browser to reflow
+                if (priceEl.scrollWidth <= available) break;
+                fontSize -= 1;
+            }
+            // constrain max width to the available space to prevent overlap
+            priceEl.style.maxWidth = (available > 0 ? available + 'px' : '100%');
+        }
+
+        Object.values(inputs).forEach(input => input.addEventListener('input', updateUI));
+        window.addEventListener('resize', ()=>{
+            // update UI (includes fitting price text)
+            updateUI();
+        });
+        // render KaTeX formula (if available)
+        window.addEventListener('load', ()=>{
+            try{
+                if (window.katex && document.getElementById('katexFormula')){
+                    const el = document.getElementById('katexFormula');
+                    const expr = String.raw`P = \sum_{t=1}^{N} \dfrac{C}{(1+r)^{t}} + \dfrac{F}{(1+r)^{N}}`;
+                    el.innerHTML = katex.renderToString(expr, {displayMode: true, throwOnError: false});
+                }
+            }catch(e){ /* fail silently */ }
+            updateUI();
+        });
+    </script>
+</body>
+</html>
